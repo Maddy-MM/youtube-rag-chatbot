@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
 import re
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled
+import xml.etree.ElementTree as ET
+
+
 
 API_URL = "https://youtube-rag-backend-js1w.onrender.com" 
 
@@ -27,19 +29,22 @@ def get_video_title(video_id: str) -> str:
     except:
         return "YouTube Video"
 
-def get_transcript(video_id: str) -> str:
+def get_transcript(video_id):
     try:
-        ytt_api = YouTubeTranscriptApi()
+        url = f"https://video.google.com/timedtext?lang=en&v={video_id}"
+        response = requests.get(url)
 
-        try:
-            transcript = ytt_api.fetch(video_id, languages=["en"])
-        except Exception:
-            transcript = ytt_api.fetch(video_id)
+        if response.status_code != 200 or not response.text:
+            return ""
 
-        return " ".join(chunk.text for chunk in transcript)
+        root = ET.fromstring(response.text)
 
-    except TranscriptsDisabled:
-        return ""
+        transcript = " ".join(
+            [elem.text for elem in root.findall(".//text") if elem.text]
+        )
+
+        return transcript
+
     except Exception as e:
         st.error(f"Transcript error: {e}")
         return ""
