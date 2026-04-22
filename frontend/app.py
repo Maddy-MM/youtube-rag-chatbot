@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import re
 
-API_URL = "https://youtube-rag-backend-js1w.onrender.com" 
+API_URL = "http://127.0.0.1:8000"
 
 st.set_page_config(page_title="YouTube RAG Chatbot")
 
@@ -47,6 +47,9 @@ h2 a {
 # -------------------------
 # Session State Init
 # -------------------------
+if "chat_started" not in st.session_state:
+    st.session_state.chat_started = False
+
 if "video_processed" not in st.session_state:
     st.session_state.video_processed = False
 
@@ -299,10 +302,12 @@ if not st.session_state.video_processed:
                 if "error" in res:
                     st.error(res["error"])
                 else:
+                    if "video_id" not in st.session_state or st.session_state.video_id != video_input:
+                        st.session_state.chat_started = False
+
                     st.session_state.video_processed = True
                     st.session_state.video_id = video_input
                     st.session_state.messages = []
-                    st.session_state.chat_started = False
                     st.rerun()
 
 # =========================
@@ -314,90 +319,90 @@ else:
         st.session_state.chat_started = False
 
     # START SCREEN
-        if not st.session_state.chat_started:
+    if not st.session_state.chat_started:
 
-            vid = extract_video_id(st.session_state.video_id)
+        vid = extract_video_id(st.session_state.video_id)
 
-            try:
-                title = get_video_title(vid)
-            except:
-                title = "YouTube Video"
+        try:
+            title = get_video_title(vid)
+        except:
+            title = "YouTube Video"
 
-            thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+        thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
 
-            col1, col2, col3 = st.columns([0.7, 2.6, 0.7])
+        col1, col2, col3 = st.columns([0.7, 2.6, 0.7])
 
-            with col2:
-                st.markdown(f"""
-                    <div style="
-                        border: 1px solid rgba(255,255,255,0.09);
-                        border-radius: 16px;
-                        overflow: hidden;
-                        background: linear-gradient(160deg, #252535 0%, #1c1c28 100%);
-                        box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
-                        margin-bottom: 0.6rem;
-                    ">
-                        <img src="{thumb}" style="
-                            width: 100%;
-                            height: 260px;
-                            object-fit: cover;
-                            object-position: center;
-                            display: block;
-                            border-bottom: 1px solid rgba(255,255,255,0.07);
-                        "/>
-                        <div style="padding: 1.2rem 1.5rem 1.4rem 1.5rem; text-align: center;">
-                            <p style="
-                                color: rgba(255,255,255,0.35);
-                                font-size: 0.7rem;
-                                font-weight: 600;
-                                letter-spacing: 0.1em;
-                                text-transform: uppercase;
-                                margin: 0 0 0.45rem 0;
-                            ">▶ Ready to Chat</p>
-                            <h2 style="
-                                color: #ffffff;
-                                font-size: 1.15rem;
-                                font-weight: 700;
-                                margin: 0 0 0.7rem 0;
-                                line-height: 1.4;
-                                letter-spacing: 0.01em;
-                            ">{title}</h2>
-                            <p style="
-                                color: rgba(255,255,255,0.35);
-                                font-size: 0.75rem;
-                                margin: 0;
-                                letter-spacing: 0.03em;
-                                text-transform: uppercase;
-                            ">Ask questions · Summarize · Explore insights</p>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-
-                st.markdown("""
-                    <style>
-                        div[data-testid="stButton"] button {
-                            background: linear-gradient(135deg, #1e1e2e 0%, #16161f 100%);
-                            border: 1px solid rgba(255,255,255,0.1);
-                            border-radius: 10px;
-                            color: #ffffff;
+        with col2:
+            st.markdown(f"""
+                <div style="
+                    border: 1px solid rgba(255,255,255,0.09);
+                    border-radius: 16px;
+                    overflow: hidden;
+                    background: linear-gradient(160deg, #252535 0%, #1c1c28 100%);
+                    box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+                    margin-bottom: 0.6rem;
+                ">
+                    <img src="{thumb}" style="
+                        width: 100%;
+                        height: 260px;
+                        object-fit: cover;
+                        object-position: center;
+                        display: block;
+                        border-bottom: 1px solid rgba(255,255,255,0.07);
+                    "/>
+                    <div style="padding: 1.2rem 1.5rem 1.4rem 1.5rem; text-align: center;">
+                        <p style="
+                            color: rgba(255,255,255,0.35);
+                            font-size: 0.7rem;
                             font-weight: 600;
-                            font-size: 0.9rem;
-                            letter-spacing: 0.04em;
+                            letter-spacing: 0.1em;
                             text-transform: uppercase;
-                            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-                            transition: all 0.2s ease;
-                        }
-                        div[data-testid="stButton"] button:hover {
-                            background: linear-gradient(135deg, #252538 0%, #1a1a28 100%);
-                            border-color: rgba(255,255,255,0.2);
+                            margin: 0 0 0.45rem 0;
+                        ">▶ Ready to Chat</p>
+                        <h2 style="
                             color: #ffffff;
-                        }
-                    </style>
-                """, unsafe_allow_html=True)
+                            font-size: 1.15rem;
+                            font-weight: 700;
+                            margin: 0 0 0.7rem 0;
+                            line-height: 1.4;
+                            letter-spacing: 0.01em;
+                        ">{title}</h2>
+                        <p style="
+                            color: rgba(255,255,255,0.35);
+                            font-size: 0.75rem;
+                            margin: 0;
+                            letter-spacing: 0.03em;
+                            text-transform: uppercase;
+                        ">Ask questions · Summarize · Explore insights</p>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
 
-                if st.button("▶  Start Chatting", use_container_width=True):
-                    st.session_state.chat_started = True
-                    st.rerun()
+            st.markdown("""
+                <style>
+                    div[data-testid="stButton"] button {
+                        background: linear-gradient(135deg, #1e1e2e 0%, #16161f 100%);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        border-radius: 10px;
+                        color: #ffffff;
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        letter-spacing: 0.04em;
+                        text-transform: uppercase;
+                        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+                        transition: all 0.2s ease;
+                    }
+                    div[data-testid="stButton"] button:hover {
+                        background: linear-gradient(135deg, #252538 0%, #1a1a28 100%);
+                        border-color: rgba(255,255,255,0.2);
+                        color: #ffffff;
+                    }
+                </style>
+            """, unsafe_allow_html=True)
+
+            if st.button("▶  Start Chatting", use_container_width=True):
+                st.session_state.chat_started = True
+                st.rerun()
 
 
     # CHAT INTERFACE
