@@ -10,4 +10,7 @@ myenv/
 .cache/
 huggingface/
 
+.env
+.env.*
+
 .git/
