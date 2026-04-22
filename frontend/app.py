@@ -1,9 +1,6 @@
 import streamlit as st
 import requests
 import re
-import xml.etree.ElementTree as ET
-
-
 
 API_URL = "https://youtube-rag-backend-js1w.onrender.com" 
 
@@ -28,26 +25,6 @@ def get_video_title(video_id: str) -> str:
         return "YouTube Video"
     except:
         return "YouTube Video"
-
-def get_transcript(video_id):
-    try:
-        url = f"https://video.google.com/timedtext?lang=en&v={video_id}"
-        response = requests.get(url)
-
-        if response.status_code != 200 or not response.text:
-            return ""
-
-        root = ET.fromstring(response.text)
-
-        transcript = " ".join(
-            [elem.text for elem in root.findall(".//text") if elem.text]
-        )
-
-        return transcript
-
-    except Exception as e:
-        st.error(f"Transcript error: {e}")
-        return ""
 
 # -------------------------
 # Styles
@@ -314,30 +291,19 @@ if not st.session_state.video_processed:
             st.warning("Please enter a video")
         else:
             with st.spinner("Processing video..."):
+                res = requests.post(
+                    f"{API_URL}/process_video",
+                    json={"video_id": video_input}
+                ).json()
 
-                video_id = extract_video_id(video_input)
-
-                transcript = get_transcript(video_id)
-
-                if not transcript:
-                    st.error("No transcript available")
+                if "error" in res:
+                    st.error(res["error"])
                 else:
-                    res = requests.post(
-                        f"{API_URL}/process_video",
-                        json={
-                            "video_id": video_id,
-                            "transcript": transcript
-                        }
-                    ).json()
-
-                    if "error" in res:
-                        st.error(res["error"])
-                    else:
-                        st.session_state.video_processed = True
-                        st.session_state.video_id = video_id
-                        st.session_state.messages = []
-                        st.session_state.chat_started = False
-                        st.rerun()
+                    st.session_state.video_processed = True
+                    st.session_state.video_id = video_input
+                    st.session_state.messages = []
+                    st.session_state.chat_started = False
+                    st.rerun()
 
 # =========================
 # SCREEN 2 → CHAT UI
