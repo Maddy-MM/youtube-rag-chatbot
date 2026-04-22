@@ -265,6 +265,85 @@ streamlit run app.py
 
 ---
 
+## System Constraints & Engineering Decisions
+
+### YouTube Transcript Fetching Limitation
+
+When deploying the backend on cloud platforms (e.g., Render), transcript fetching using `youtube-transcript-api` may fail due to IP-based blocking by YouTube.
+
+- Local environment works correctly
+    
+- Cloud deployment fails
+    
+
+---
+
+### Root Cause
+
+- Local machine uses a **residential IP**, which is allowed
+    
+- Cloud platforms use **datacenter IPs**, which are often blocked
+    
+- This is a limitation of YouTube’s anti-scraping mechanisms, not an issue with the code
+    
+
+---
+
+### Architectural Decision
+
+To ensure reliability, transcript fetching is handled on the **frontend**, while processing is handled on the **backend**.
+
+- Frontend → Fetch transcript
+    
+- Backend → Process transcript
+    
+
+---
+
+### Updated System Flow
+
+1. Frontend extracts video ID
+    
+2. Frontend fetches transcript from YouTube
+    
+3. Frontend sends transcript to backend API
+    
+4. Backend performs:
+    
+    - Text splitting
+        
+    - Embedding generation
+        
+    - Vector storage
+        
+    - Retrieval
+        
+    - Answer generation
+        
+
+---
+
+### Why This Approach Works
+
+- Browser requests resemble normal user traffic
+    
+- Avoids cloud IP blocking
+    
+- Ensures consistent behavior across environments
+    
+- Improves system reliability
+    
+
+---
+
+### Key Takeaway
+
+Not all failures originate from code.  
+Some arise due to **infrastructure and network constraints**, and solving them requires adjusting system design rather than logic.
+
+---
+
+
 ## Limitations
 
 * No persistent storage (data resets on restart)
