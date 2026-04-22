@@ -1,0 +1,13 @@
+myenv/
+.venv
+venv
+env
+
+.cache
+huggingface
+models
+
+__pycache__
+*.pyc
+
+.git
