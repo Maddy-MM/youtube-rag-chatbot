@@ -12,7 +12,7 @@ router = APIRouter()
 # In-memory store
 vector_store_cache = {}
 
-
+# Models
 class VideoRequest(BaseModel):
     video_id: str
 
@@ -24,12 +24,18 @@ class ManualTranscriptRequest(BaseModel):
     video_id: str
     transcript: str
 
+# Helper Function
 def extract_video_id(url: str) -> str:
     if "v=" in url:
         return url.split("v=")[-1].split("&")[0]
     elif "youtu.be/" in url:
         return url.split("youtu.be/")[-1].split("?")[0]
     return url  # already an ID
+
+#Endpoints
+@router.get("/health")
+def health():
+    return {"status": "ok"}
 
 @router.post("/process_video")
 def process_video(req: VideoRequest):

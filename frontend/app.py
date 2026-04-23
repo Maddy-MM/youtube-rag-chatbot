@@ -18,11 +18,11 @@ def extract_video_id(url: str) -> str:
 
 def get_video_title(video_id: str) -> str:
     try:
-        html = requests.get(f"https://www.youtube.com/watch?v={video_id}").text
-        match = re.search(r"<title>(.*?)</title>", html)
-        if match:
-            return match.group(1).replace(" - YouTube", "")
-        return "YouTube Video"
+        res = requests.get(
+            f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json",
+            timeout=5
+        )
+        return res.json().get("title", "YouTube Video")
     except:
         return "YouTube Video"
 
