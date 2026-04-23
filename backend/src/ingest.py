@@ -1,4 +1,5 @@
 import os
+from requests import Session
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
 
@@ -18,13 +19,19 @@ def get_transcript(video_id: str) -> tuple[str | None, str | None]:
     except Exception as e:
         print("Direct fetch failed, trying proxy:", e)
 
-    # Layer 2: proxy fetch using v1.2.4 WebshareProxyConfig
+    # Layer 2: proxy fetch with 3 second timeout to avoid long waits on failure
     try:
+        session = Session()
+        session.request = lambda method, url, **kwargs: Session.request(
+            session, method, url, timeout=3, **kwargs
+        )
+
         ytt_api_proxy = YouTubeTranscriptApi(
             proxy_config=WebshareProxyConfig(
                 proxy_username=os.environ["WEBSHARE_USER"],
                 proxy_password=os.environ["WEBSHARE_PASS"],
-            )
+            ),
+            http_client=session
         )
 
         try:
