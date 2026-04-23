@@ -1,24 +1,69 @@
+import os
+from requests import Session
+from requests.adapters import HTTPAdapter
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
+
+def _fetch_with_proxy(video_id: str) -> str | None:
+    session = Session()
+    adapter = HTTPAdapter(max_retries=0)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    session.request = lambda method, url, **kwargs: Session.request(
+        session, method, url, timeout=3, **kwargs
+    )
+
+    ytt_api_proxy = YouTubeTranscriptApi(
+        proxy_config=WebshareProxyConfig(
+            proxy_username=os.environ["WEBSHARE_USER"],
+            proxy_password=os.environ["WEBSHARE_PASS"],
+        ),
+        http_client=session
+    )
+
+    try:
+        transcript = ytt_api_proxy.fetch(video_id, languages=["en"])
+    except Exception:
+        transcript = ytt_api_proxy.fetch(video_id)
+
+    return " ".join(chunk.text for chunk in transcript)
+
 
 def get_transcript(video_id: str) -> tuple[str | None, str | None]:
 
-    # Layer 1: try English first
+    # Layer 1: direct fetch (no proxy)
     try:
         ytt_api = YouTubeTranscriptApi()
-        transcript = ytt_api.fetch(video_id, languages=["en"])
+        try:
+            transcript = ytt_api.fetch(video_id, languages=["en"])
+        except Exception:
+            transcript = ytt_api.fetch(video_id)
+
         text = " ".join(chunk.text for chunk in transcript)
         return text, None
 
     except Exception as e:
-        print("English transcript failed, trying any language:", e)
+        print("Direct fetch failed:", e)
 
-    # Layer 2: try any available language
+    # Layer 2: proxy fetch — only attempted if credentials are configured
+    proxy_user = os.environ.get("WEBSHARE_USER")
+    proxy_pass = os.environ.get("WEBSHARE_PASS")
+
+    if not proxy_user or not proxy_pass:
+        print("No proxy credentials configured, skipping to fallback")
+        return None, "fallback"
+
     try:
-        ytt_api = YouTubeTranscriptApi()
-        transcript = ytt_api.fetch(video_id)
-        text = " ".join(chunk.text for chunk in transcript)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_fetch_with_proxy, video_id)
+            text = future.result(timeout=3)
         return text, None
 
+    except TimeoutError:
+        print("Proxy fetch timed out after 3 seconds, fallback needed")
+        return None, "fallback"
+
     except Exception as e:
-        print("All transcript fetch failed, fallback needed:", e)
+        print("Proxy fetch failed, fallback needed:", e)
         return None, "fallback"
