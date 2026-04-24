@@ -1,0 +1,17 @@
+[theme]
+base = "dark"
+
+# Deep dark background matching your existing card backgrounds
+backgroundColor = "#0E0E16"
+
+# Slightly lighter for sidebar and secondary containers
+secondaryBackgroundColor = "#1A1A28"
+
+# YouTube red as the accent — ties into your ▶ branding throughout the app
+primaryColor = "#FF3333"
+
+# Soft white for readability without harshness
+textColor = "#F0F0F0"
+
+# Clean and modern — matches the uppercase tracking in your custom CSS
+font = "sans serif"
