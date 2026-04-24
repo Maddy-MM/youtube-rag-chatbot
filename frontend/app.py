@@ -4,7 +4,7 @@ import re
 
 API_URL = "https://youtube-rag-backend-js1w.onrender.com/"
 
-st.set_page_config(page_title="YouTube RAG Chatbot")
+st.set_page_config(page_title="YouTube RAG Assistant")
 
 # -------------------------
 # Helpers
@@ -214,9 +214,9 @@ if not st.session_state.video_processed:
                 box-shadow: 0 4px 14px rgba(255,0,0,0.4);
             ">▶</span>
             <div>
-                <h1 style="color: #ffffff; margin: 0; padding: 0; font-size: 1.45rem; line-height: 1.3; font-weight: 700; letter-spacing: 0.01em;">YouTube RAG Chatbot</h1>
+                <h1 style="color: #ffffff; margin: 0; padding: 0; font-size: 1.45rem; line-height: 1.3; font-weight: 700; letter-spacing: 0.01em;">YouTube RAG Assistant</h1>
                 <p style="color: rgba(255,255,255,0.55); margin: 0.25rem 0 0 0; font-size: 0.82rem; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase;">
-                    Retrieval-Augmented Generation
+                    Transcript-Aware Question Answering System
                 </p>
             </div>
         </div>
@@ -322,6 +322,18 @@ if not st.session_state.video_processed:
                 st.session_state.video_id = video_input
                 st.session_state.messages = []
                 st.rerun()
+
+    st.markdown("""
+        <p style="
+            color: rgba(255,255,255,0.45);
+            font-size: 0.78rem;
+            text-align: center;
+            margin-top: 0.6rem;
+            letter-spacing: 0.03em;
+        ">
+            ⏱ First request may take 30–60s while the backend wakes up
+        </p>
+    """, unsafe_allow_html=True)
 
     # Fallback UI lives OUTSIDE the button block so it survives reruns
     if st.session_state.show_fallback:
