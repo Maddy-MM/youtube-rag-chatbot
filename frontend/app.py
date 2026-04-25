@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
-import re
 
-API_URL = "https://youtube-rag-backend-js1w.onrender.com/"
+API_URL = "https://youtube-rag-backend-js1w.onrender.com"
+# API_URL = "http://127.0.0.1:8000"
 
-st.set_page_config(page_title="YouTube RAG Assistant")
+st.set_page_config(page_title="YTLens")
 
 # -------------------------
 # Helpers
@@ -26,50 +26,42 @@ def get_video_title(video_id: str) -> str:
     except:
         return "YouTube Video"
 
-# -------------------------
-# Styles
-# -------------------------
-card_style = """
-    background-color: rgba(255, 255, 255, 0.04);
-    padding: 1.2rem 1.4rem;
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-"""
+def auth_headers() -> dict:
+    return {"Authorization": f"Bearer {st.session_state.token}"}
 
+# -------------------------
+# Global style — hide anchor icons
+# -------------------------
 st.markdown("""
 <style>
-h2 a {
-    display: none !important;
-}
+h1 a, h2 a, h3 a { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------
 # Session State Init
 # -------------------------
+if "token" not in st.session_state:
+    st.session_state.token = None
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = "login"
 if "chat_started" not in st.session_state:
     st.session_state.chat_started = False
-
 if "video_processed" not in st.session_state:
     st.session_state.video_processed = False
-
 if "video_id" not in st.session_state:
     st.session_state.video_id = ""
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 if "show_fallback" not in st.session_state:
     st.session_state.show_fallback = False
-
 if "fallback_video_id" not in st.session_state:
     st.session_state.fallback_video_id = ""
-
 if "manual_transcript" not in st.session_state:
     st.session_state.manual_transcript = ""
 
 # -------------------------
-# SIDE BAR
+# SIDEBAR
 # -------------------------
 with st.sidebar:
 
@@ -77,37 +69,43 @@ with st.sidebar:
         <div style="
             display: flex;
             align-items: center;
-            gap: 0.8rem;
+            gap: 0.75rem;
             padding: 0.4rem 0 1.2rem 0;
             border-bottom: 1px solid rgba(255,255,255,0.07);
             margin-bottom: 1.4rem;
         ">
-            <span style="
-                background: #FF0000;
-                color: white;
-                font-size: 0.9rem;
-                border-radius: 6px;
-                padding: 0.25rem 0.45rem;
-                line-height: 1;
-                box-shadow: 0 2px 8px rgba(255,0,0,0.35);
-            ">▶</span>
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #FF0000 0%, #cc0000 100%);
+                border-radius: 8px;
+                width: 32px;
+                height: 32px;
+                flex-shrink: 0;
+                box-shadow: 0 2px 10px rgba(255,0,0,0.4);
+            ">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="white">
+                    <path d="M8 5.14v14l11-7-11-7z"/>
+                </svg>
+            </div>
             <div>
                 <p style="
                     color: #ffffff;
-                    font-size: 0.85rem;
-                    font-weight: 700;
-                    letter-spacing: 0.06em;
-                    text-transform: uppercase;
+                    font-size: 0.9rem;
+                    font-weight: 800;
+                    letter-spacing: 0.02em;
                     margin: 0;
                     line-height: 1;
-                ">YouTube RAG</p>
+                ">YT<span style="color: rgba(255,255,255,0.5); font-weight: 400;">Lens</span></p>
                 <p style="
-                    color: rgba(255,255,255,0.55);
-                    font-size: 0.68rem;
-                    letter-spacing: 0.04em;
-                    margin: 0.25rem 0 0 0;
+                    color: rgba(255,255,255,0.4);
+                    font-size: 0.65rem;
+                    letter-spacing: 0.06em;
+                    margin: 0.2rem 0 0 0;
                     line-height: 1;
-                ">Retrieval-Augmented Generation</p>
+                    text-transform: uppercase;
+                ">Video Intelligence</p>
             </div>
         </div>
 
@@ -127,157 +125,287 @@ with st.sidebar:
             margin-bottom: 1.4rem;
             background: rgba(255,255,255,0.02);
         ">
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
-                <span style="color:rgba(255,255,255,0.4); font-size:0.75rem; font-weight:600;">01</span>
-                <span style="color:#ffffff; font-size:0.88rem; font-weight:500;">Extract transcript</span>
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:rgba(255,0,0,0.7); font-size:0.7rem; font-weight:700;">01</span>
+                <span style="color:#ffffff; font-size:0.85rem; font-weight:500;">Extract transcript</span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
-                <span style="color:rgba(255,255,255,0.4); font-size:0.75rem; font-weight:600;">02</span>
-                <span style="color:#ffffff; font-size:0.88rem; font-weight:500;">Split into chunks</span>
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:rgba(255,0,0,0.7); font-size:0.7rem; font-weight:700;">02</span>
+                <span style="color:#ffffff; font-size:0.85rem; font-weight:500;">Split into chunks</span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
-                <span style="color:rgba(255,255,255,0.4); font-size:0.75rem; font-weight:600;">03</span>
-                <span style="color:#ffffff; font-size:0.88rem; font-weight:500;">Create embeddings</span>
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:rgba(255,0,0,0.7); font-size:0.7rem; font-weight:700;">03</span>
+                <span style="color:#ffffff; font-size:0.85rem; font-weight:500;">Create embeddings</span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
-                <span style="color:rgba(255,255,255,0.4); font-size:0.75rem; font-weight:600;">04</span>
-                <span style="color:#ffffff; font-size:0.88rem; font-weight:500;">Retrieve context</span>
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <span style="color:rgba(255,0,0,0.7); font-size:0.7rem; font-weight:700;">04</span>
+                <span style="color:#ffffff; font-size:0.85rem; font-weight:500;">Retrieve context</span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.8rem 1rem;">
-                <span style="color:rgba(255,255,255,0.4); font-size:0.75rem; font-weight:600;">05</span>
-                <span style="color:#ffffff; font-size:0.88rem; font-weight:500;">Generate answer</span>
+            <div style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem;">
+                <span style="color:rgba(255,0,0,0.7); font-size:0.7rem; font-weight:700;">05</span>
+                <span style="color:#ffffff; font-size:0.85rem; font-weight:500;">Generate answer</span>
             </div>
         </div>
 
         <p style="
             color: rgba(255,255,255,0.4);
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 0.1em;
             text-transform: uppercase;
             margin: 0 0 0.7rem 0;
         ">Tech Stack</p>
 
-        <div style="
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1.8rem;
-        ">
-            <span style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.75rem; color:#ffffff; font-size:0.78rem; font-weight:500; letter-spacing:0.03em;">FastAPI</span>
-            <span style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.75rem; color:#ffffff; font-size:0.78rem; font-weight:500; letter-spacing:0.03em;">LangChain</span>
-            <span style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.75rem; color:#ffffff; font-size:0.78rem; font-weight:500; letter-spacing:0.03em;">FAISS</span>
-            <span style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.75rem; color:#ffffff; font-size:0.78rem; font-weight:500; letter-spacing:0.03em;">HuggingFace</span>
-            <span style="background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:0.35rem 0.75rem; color:#ffffff; font-size:0.78rem; font-weight:500; letter-spacing:0.03em;">Streamlit</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 1.8rem;">
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">FastAPI</span>
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">LangChain</span>
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">FAISS</span>
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">HuggingFace</span>
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">Streamlit</span>
+            <span style="background:rgba(255,0,0,0.12); border:1px solid rgba(255,0,0,0.25); border-radius:6px; padding:0.3rem 0.7rem; color:#ffffff; font-size:0.75rem; font-weight:500; letter-spacing:0.03em;">JWT Auth</span>
         </div>
 
-        <div style="
-            border-top: 1px solid rgba(255,255,255,0.12);
-            padding-top: 1rem;
-        ">
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
             <p style="
-                color: rgba(255,255,255,0.45);
-                font-size: 0.68rem;
+                color: rgba(255,255,255,0.3);
+                font-size: 0.65rem;
                 letter-spacing: 0.06em;
                 text-transform: uppercase;
                 margin: 0;
                 text-align: center;
-            ">Built for learning GenAI systems</p>
+            ">AI-powered video intelligence</p>
         </div>
     """, unsafe_allow_html=True)
+
+    # Logout button — only shown when logged in
+    if st.session_state.token:
+        st.markdown("<div style='margin-top: 1rem;'>", unsafe_allow_html=True)
+        if st.button("⎋  Logout", use_container_width=True):
+            st.session_state.token = None
+            st.session_state.video_processed = False
+            st.session_state.chat_started = False
+            st.session_state.messages = []
+            st.session_state.show_fallback = False
+            st.session_state.manual_transcript = ""
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================
+# SCREEN 0 → LOGIN / REGISTER
+# =========================
+if not st.session_state.token:
+
+    st.markdown("""
+        <style>
+            .block-container {
+                padding-top: 5vh !important;
+                max-width: 400px !important;
+            }
+            div[data-testid="stTextInput"] div[data-testid="InputInstructions"] {
+                display: none !important;
+            }
+            div[data-testid="stTextInput"] label {
+                color: rgba(255,255,255,0.38);
+                font-size: 0.7rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+            }
+            div[data-testid="stTextInput"] input {
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 10px;
+                background-color: rgba(255,255,255,0.04);
+                color: #ffffff;
+                padding: 0.65rem 1rem;
+                font-size: 0.93rem;
+                transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+            div[data-testid="stTextInput"] input:focus {
+                border-color: rgba(255, 50, 50, 0.5);
+                box-shadow: 0 0 0 3px rgba(255,50,50,0.08);
+            }
+            div[data-testid="stButton"] button {
+                background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+                border: none;
+                border-radius: 10px;
+                color: #ffffff;
+                font-weight: 700;
+                font-size: 0.92rem;
+                letter-spacing: 0.05em;
+                transition: all 0.2s ease;
+                box-shadow: 0 4px 18px rgba(180,0,0,0.4);
+            }
+            div[data-testid="stButton"] button:hover {
+                background: linear-gradient(135deg, #ff1a1a 0%, #cc0000 100%);
+                box-shadow: 0 6px 24px rgba(220,0,0,0.5);
+                color: #ffffff;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Logo + branding
+    st.markdown(f"""
+        <style>
+            div[data-testid="stMarkdown"] > div {{ width: 100% !important; }}
+        </style>
+        <div style="width: 100%; text-align: center; margin-bottom: 2.2rem;">
+            <div style="
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #FF0000 0%, #cc0000 100%);
+                border-radius: 20px;
+                width: 68px;
+                height: 68px;
+                box-shadow: 0 8px 32px rgba(255,0,0,0.45);
+                margin-bottom: 1.1rem;
+            ">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
+                    <path d="M8 5.14v14l11-7-11-7z"/>
+                </svg>
+            </div>
+            <h1 style="
+                color: #ffffff;
+                font-size: 1.9rem;
+                font-weight: 900;
+                margin: 0 0 0.2rem 0;
+                letter-spacing: -0.03em;
+                line-height: 1;
+            ">YT<span style="color: rgba(255,255,255,0.45); font-weight: 300;">Lens</span></h1>
+            <p style="
+                color: rgba(255,255,255,0.28);
+                font-size: 0.68rem;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                font-weight: 600;
+                margin: 0 0 0.15rem 0;
+            ">Video Intelligence Platform</p>
+            <p style="
+                color: rgba(255,100,100,0.6);
+                font-size: 0.68rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                font-weight: 500;
+                margin: 0;
+            ">{'Sign in to continue' if st.session_state.auth_mode == 'login' else 'Create your account'}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    username = st.text_input("Username", placeholder="Enter your username", key="auth_username")
+    password = st.text_input("Password", placeholder="Enter your password", type="password", key="auth_password")
+    st.markdown("<div style='height: 0.2rem'></div>", unsafe_allow_html=True)
+
+    if st.session_state.auth_mode == "login":
+        if st.button("Sign In", use_container_width=True):
+            if not username or not password:
+                st.warning("Please enter both username and password.")
+            else:
+                with st.spinner("Signing in..."):
+                    try:
+                        res = requests.post(
+                            f"{API_URL}/login",
+                            json={"username": username, "password": password}
+                        ).json()
+                    except Exception:
+                        st.error("Could not reach the backend. Please try again.")
+                        st.stop()
+
+                if "access_token" in res:
+                    st.session_state.token = res["access_token"]
+                    st.rerun()
+                else:
+                    st.error(res.get("detail", "Login failed."))
+
+        st.markdown("""
+            <p style="text-align: center; margin-top: 1rem; color: rgba(255,255,255,0.28); font-size: 0.82rem;">
+                Don't have an account?
+                <a href="?auth_mode=register" target="_self"
+                   style="color: rgba(255,120,120,0.9); font-weight: 600; text-decoration: none;">
+                    Register
+                </a>
+            </p>
+        """, unsafe_allow_html=True)
+
+        params = st.query_params
+        if params.get("auth_mode") == "register":
+            st.query_params.clear()
+            st.session_state.auth_mode = "register"
+            st.rerun()
+
+    else:
+        if st.button("Create Account", use_container_width=True):
+            if not username or not password:
+                st.warning("Please enter both username and password.")
+            elif len(password) < 6:
+                st.warning("Password must be at least 6 characters.")
+            else:
+                with st.spinner("Creating account..."):
+                    try:
+                        res = requests.post(
+                            f"{API_URL}/register",
+                            json={"username": username, "password": password}
+                        ).json()
+                    except Exception:
+                        st.error("Could not reach the backend. Please try again.")
+                        st.stop()
+
+                if "message" in res:
+                    st.success("Account created! You can now sign in.")
+                    st.session_state.auth_mode = "login"
+                    st.rerun()
+                else:
+                    st.error(res.get("detail", "Registration failed."))
+
+        st.markdown("""
+            <p style="text-align: center; margin-top: 1rem; color: rgba(255,255,255,0.28); font-size: 0.82rem;">
+                Already have an account?
+                <a href="?auth_mode=login" target="_self"
+                   style="color: rgba(255,120,120,0.9); font-weight: 600; text-decoration: none;">
+                    Sign in
+                </a>
+            </p>
+        """, unsafe_allow_html=True)
+
+        params = st.query_params
+        if params.get("auth_mode") == "login":
+            st.query_params.clear()
+            st.session_state.auth_mode = "login"
+            st.rerun()
+
+    st.stop()
+
 
 # =========================
 # SCREEN 1 → VIDEO INPUT
 # =========================
 if not st.session_state.video_processed:
 
-    st.markdown(
-        """
-        <div style="
-            background: linear-gradient(135deg, #1e1e2e 0%, #16161f 100%);
-            padding: 1.6rem 2rem;
-            border-radius: 16px;
-            margin-bottom: 1.8rem;
-            display: flex;
-            align-items: center;
-            gap: 1.4rem;
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
-        ">
-            <span style="
-                font-size: 1.6rem;
-                background: #FF0000;
-                color: white;
-                border-radius: 10px;
-                padding: 0.4rem 0.65rem;
-                line-height: 1;
-                box-shadow: 0 4px 14px rgba(255,0,0,0.4);
-            ">▶</span>
-            <div>
-                <h1 style="color: #ffffff; margin: 0; padding: 0; font-size: 1.45rem; line-height: 1.3; font-weight: 700; letter-spacing: 0.01em;">YouTube RAG Assistant</h1>
-                <p style="color: rgba(255,255,255,0.55); margin: 0.25rem 0 0 0; font-size: 0.82rem; font-weight: 400; letter-spacing: 0.04em; text-transform: uppercase;">
-                    Transcript-Aware Question Answering System
-                </p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("""
-    <div style="
-        border: 1px solid rgba(255,255,255,0.09);
-        border-radius: 12px;
-        padding: 0.9rem 1.4rem;
-        background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
-        margin-bottom: 1.2rem;
-        display: flex;
-        align-items: center;
-        gap: 0.8rem;
-    ">
-        <span style="
-            color: #FF4444;
-            font-size: 0.85rem;
-        ">▶</span>
-        <h3 style='
-            background: linear-gradient(90deg, #ffffff 0%, rgba(255,255,255,0.6) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin: 0;
-            padding: 0;
-            font-size: 0.85rem;
-            font-weight: 600;
-            letter-spacing: 0.07em;
-            text-transform: uppercase;
-        '>Load a Video</h3>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("""
         <style>
+            .block-container { padding-top: 12vh !important; max-width: 860px !important; }
             div[data-testid="stTextInput"] label {
-                color: #aaaaaa;
-                font-size: 0.85rem;
-                font-weight: 500;
-                letter-spacing: 0.03em;
+                color: rgba(255,255,255,0.4);
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.1em;
                 text-transform: uppercase;
             }
             div[data-testid="stTextInput"] input {
-                border: 1px solid rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.09);
                 border-radius: 10px;
                 background-color: rgba(255,255,255,0.03);
                 color: #ffffff;
-                padding: 0.6rem 1rem;
+                padding: 0.65rem 1rem;
                 font-size: 0.95rem;
-                transition: border-color 0.2s ease;
             }
             div[data-testid="stTextInput"] input:focus {
-                border-color: rgba(255,255,255,0.3);
-                box-shadow: 0 0 0 2px rgba(255,255,255,0.05);
+                border-color: rgba(255,50,50,0.4);
+                box-shadow: 0 0 0 3px rgba(255,50,50,0.07);
             }
             div[data-testid="stButton"] button {
-                background: rgba(255,255,255,0.06);
-                border: 1px solid rgba(255,255,255,0.12);
+                background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.1);
                 border-radius: 10px;
                 color: #ffffff;
                 font-weight: 600;
@@ -286,11 +414,93 @@ if not st.session_state.video_processed:
                 transition: all 0.2s ease;
             }
             div[data-testid="stButton"] button:hover {
-                background: rgba(255,255,255,0.1);
-                border-color: rgba(255,255,255,0.25);
+                background: rgba(255,255,255,0.09);
+                border-color: rgba(255,255,255,0.2);
                 color: #ffffff;
             }
+            div[data-testid="stTextInput"] div[data-testid="InputInstructions"] {
+                display: none !important;
+            }
         </style>
+    """, unsafe_allow_html=True)
+
+    # Header
+    st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #1a1a26 0%, #13131c 100%);
+            padding: 1.4rem 1.8rem;
+            border-radius: 14px;
+            margin-bottom: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        ">
+            <div style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: linear-gradient(135deg, #FF0000 0%, #cc0000 100%);
+                border-radius: 10px;
+                width: 40px;
+                height: 40px;
+                flex-shrink: 0;
+                box-shadow: 0 4px 14px rgba(255,0,0,0.4);
+            ">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="white">
+                    <path d="M8 5.14v14l11-7-11-7z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 style="
+                    color: #ffffff;
+                    margin: 0;
+                    padding: 0;
+                    font-size: 1.3rem;
+                    font-weight: 900;
+                    letter-spacing: -0.02em;
+                    line-height: 1;
+                ">YT<span style="color: rgba(255,255,255,0.4); font-weight: 300;">Lens</span></h1>
+                <p style="
+                    color: rgba(255,255,255,0.35);
+                    margin: 0.3rem 0 0 0;
+                    font-size: 0.72rem;
+                    font-weight: 500;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                ">AI-Powered Video Intelligence</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Load a video section header
+    st.markdown("""
+        <div style="
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 0.8rem 1.2rem;
+            background: rgba(255,255,255,0.02);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
+        ">
+            <div style="
+                width: 6px; height: 6px;
+                background: #FF0000;
+                border-radius: 50%;
+                box-shadow: 0 0 6px rgba(255,0,0,0.6);
+            "></div>
+            <p style="
+                color: rgba(255,255,255,0.6);
+                margin: 0;
+                font-size: 0.78rem;
+                font-weight: 700;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            ">Load a Video</p>
+        </div>
     """, unsafe_allow_html=True)
 
     video_input = st.text_input(
@@ -298,25 +508,25 @@ if not st.session_state.video_processed:
         placeholder="Paste YouTube link here..."
     )
 
-    if st.button("Process Video", use_container_width=True):
+    if st.button("Analyse Video", use_container_width=True):
         if not video_input:
-            st.warning("Please enter a video")
+            st.warning("Please enter a video URL or ID.")
         else:
-            with st.spinner("Processing video..."):
+            with st.spinner("Analysing video..."):
                 res = requests.post(
                     f"{API_URL}/process_video",
-                    json={"video_id": video_input}
+                    json={"video_id": video_input},
+                    headers=auth_headers()
                 ).json()
 
             if res.get("error") == "fallback":
-                # Just set the flag — actual UI is rendered outside this block
                 st.session_state.show_fallback = True
                 st.session_state.fallback_video_id = video_input
             elif "error" in res:
                 st.error(res["error"])
             else:
                 st.session_state.show_fallback = False
-                if "video_id" not in st.session_state or st.session_state.video_id != video_input:
+                if st.session_state.video_id != video_input:
                     st.session_state.chat_started = False
                 st.session_state.video_processed = True
                 st.session_state.video_id = video_input
@@ -325,17 +535,17 @@ if not st.session_state.video_processed:
 
     st.markdown("""
         <p style="
-            color: rgba(255,255,255,0.45);
-            font-size: 0.78rem;
+            color: rgba(255,255,255,0.3);
+            font-size: 0.75rem;
             text-align: center;
             margin-top: 0.6rem;
             letter-spacing: 0.03em;
         ">
-            ⏱ First request may take 30–60s while the backend wakes up
+            🔒 Your session is secured with JWT authentication
         </p>
     """, unsafe_allow_html=True)
 
-    # Fallback UI lives OUTSIDE the button block so it survives reruns
+    # Fallback UI
     if st.session_state.show_fallback:
         st.warning("Couldn't fetch transcript automatically.")
         st.markdown(
@@ -359,7 +569,8 @@ if not st.session_state.video_processed:
                         json={
                             "video_id": st.session_state.fallback_video_id,
                             "transcript": st.session_state.manual_transcript
-                        }
+                        },
+                        headers=auth_headers()
                     ).json()
 
                 if "error" in res2:
@@ -372,6 +583,7 @@ if not st.session_state.video_processed:
                     st.session_state.messages = []
                     st.rerun()
 
+
 # =========================
 # SCREEN 2 → CHAT UI
 # =========================
@@ -380,7 +592,7 @@ else:
     if "chat_started" not in st.session_state:
         st.session_state.chat_started = False
 
-    # START SCREEN
+    # VIDEO READY SCREEN
     if not st.session_state.chat_started:
 
         vid = extract_video_id(st.session_state.video_id)
@@ -397,43 +609,55 @@ else:
         with col2:
             st.markdown(f"""
                 <div style="
-                    border: 1px solid rgba(255,255,255,0.09);
+                    border: 1px solid rgba(255,255,255,0.08);
                     border-radius: 16px;
                     overflow: hidden;
-                    background: linear-gradient(160deg, #252535 0%, #1c1c28 100%);
-                    box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+                    background: linear-gradient(160deg, #1e1e2e 0%, #16161f 100%);
+                    box-shadow: 0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
                     margin-bottom: 0.6rem;
                 ">
-                    <img src="{thumb}" style="
-                        width: 100%;
-                        height: 260px;
-                        object-fit: cover;
-                        object-position: center;
-                        display: block;
-                        border-bottom: 1px solid rgba(255,255,255,0.07);
-                    "/>
-                    <div style="padding: 1.2rem 1.5rem 1.4rem 1.5rem; text-align: center;">
-                        <p style="
-                            color: rgba(255,255,255,0.35);
-                            font-size: 0.7rem;
-                            font-weight: 600;
-                            letter-spacing: 0.1em;
-                            text-transform: uppercase;
-                            margin: 0 0 0.45rem 0;
-                        ">▶ Ready to Chat</p>
+                    <div style="position: relative;">
+                        <img src="{thumb}" style="
+                            width: 100%;
+                            height: 240px;
+                            object-fit: cover;
+                            object-position: center;
+                            display: block;
+                        "/>
+                        <div style="
+                            position: absolute;
+                            top: 0; left: 0; right: 0; bottom: 0;
+                            background: linear-gradient(to bottom, transparent 50%, rgba(22,22,31,0.95) 100%);
+                        "></div>
+                        <div style="
+                            position: absolute;
+                            top: 0.7rem; left: 0.7rem;
+                            background: rgba(0,0,0,0.6);
+                            border: 1px solid rgba(255,255,255,0.1);
+                            border-radius: 6px;
+                            padding: 0.25rem 0.55rem;
+                            display: flex;
+                            align-items: center;
+                            gap: 0.35rem;
+                        ">
+                            <div style="width:6px; height:6px; background:#FF0000; border-radius:50%; box-shadow: 0 0 5px rgba(255,0,0,0.8);"></div>
+                            <span style="color:rgba(255,255,255,0.8); font-size:0.65rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">Ready</span>
+                        </div>
+                    </div>
+                    <div style="padding: 1.2rem 1.5rem 1.5rem 1.5rem; text-align: center;">
                         <h2 style="
                             color: #ffffff;
-                            font-size: 1.15rem;
+                            font-size: 1.05rem;
                             font-weight: 700;
-                            margin: 0 0 0.7rem 0;
+                            margin: 0 0 0.6rem 0;
                             line-height: 1.4;
                             letter-spacing: 0.01em;
                         ">{title}</h2>
                         <p style="
-                            color: rgba(255,255,255,0.35);
-                            font-size: 0.75rem;
+                            color: rgba(255,255,255,0.28);
+                            font-size: 0.7rem;
                             margin: 0;
-                            letter-spacing: 0.03em;
+                            letter-spacing: 0.06em;
                             text-transform: uppercase;
                         ">Ask questions · Summarize · Explore insights</p>
                     </div>
@@ -443,116 +667,106 @@ else:
             st.markdown("""
                 <style>
                     div[data-testid="stButton"] button {
-                        background: linear-gradient(135deg, #1e1e2e 0%, #16161f 100%);
-                        border: 1px solid rgba(255,255,255,0.1);
+                        background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+                        border: none;
                         border-radius: 10px;
                         color: #ffffff;
-                        font-weight: 600;
-                        font-size: 0.9rem;
-                        letter-spacing: 0.04em;
+                        font-weight: 700;
+                        font-size: 0.88rem;
+                        letter-spacing: 0.06em;
                         text-transform: uppercase;
-                        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+                        box-shadow: 0 4px 18px rgba(180,0,0,0.4);
                         transition: all 0.2s ease;
                     }
                     div[data-testid="stButton"] button:hover {
-                        background: linear-gradient(135deg, #252538 0%, #1a1a28 100%);
-                        border-color: rgba(255,255,255,0.2);
-                        color: #ffffff;
+                        background: linear-gradient(135deg, #ff1a1a 0%, #cc0000 100%);
+                        box-shadow: 0 6px 24px rgba(220,0,0,0.5);
                     }
                 </style>
             """, unsafe_allow_html=True)
 
-            if st.button("▶  Start Chatting", use_container_width=True):
+            if st.button("Start Chatting  →", use_container_width=True):
                 st.session_state.chat_started = True
                 st.rerun()
 
-
     # CHAT INTERFACE
     else:
-
-        # Header row
-        if st.button("↩  Upload a Different Video", use_container_width=True, key="new_video_btn"):
-            st.session_state.video_processed = False
-            st.session_state.chat_started = False
-            st.session_state.messages = []
-            st.rerun()
 
         st.markdown("""
             <style>
                 div[data-testid="stButton"] button {
                     background: rgba(255,255,255,0.04);
-                    border: 1px solid rgba(255,255,255,0.15);
-                    border-radius: 10px;
-                    color: rgba(255,255,255,0.7);
-                    font-size: 0.75rem;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    color: rgba(255,255,255,0.5);
+                    font-size: 0.72rem;
                     font-weight: 600;
                     letter-spacing: 0.08em;
                     text-transform: uppercase;
                     transition: all 0.2s ease;
                 }
                 div[data-testid="stButton"] button:hover {
-                    background: rgba(255,255,255,0.06);
-                    border-color: rgba(255,255,255,0.25);
+                    background: rgba(255,255,255,0.07);
+                    border-color: rgba(255,255,255,0.18);
                     color: #ffffff;
                 }
-
-                div style="
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                margin-bottom: 1.4rem;
-            ">
             </style>
+        """, unsafe_allow_html=True)
 
+        if st.button("↩  Analyse a Different Video", use_container_width=True, key="new_video_btn"):
+            st.session_state.video_processed = False
+            st.session_state.chat_started = False
+            st.session_state.messages = []
+            st.rerun()
+
+        st.markdown("""
             <div style="
                 display: flex;
                 align-items: center;
                 gap: 1rem;
-                margin-bottom: 1.4rem;
-                margin-top: 1rem;
+                margin: 1rem 0 1.4rem 0;
             ">
-                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.15);"></div>
-                <span style="
-                    color: #ffffff;
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    letter-spacing: 0.12em;
-                    text-transform: uppercase;
-                ">Chat</span>
-                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.15);"></div>
+                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width:5px; height:5px; background:#FF0000; border-radius:50%; box-shadow: 0 0 5px rgba(255,0,0,0.7);"></div>
+                    <span style="
+                        color: rgba(255,255,255,0.5);
+                        font-size: 0.7rem;
+                        font-weight: 700;
+                        letter-spacing: 0.14em;
+                        text-transform: uppercase;
+                    ">YTLens Chat</span>
+                    <div style="width:5px; height:5px; background:#FF0000; border-radius:50%; box-shadow: 0 0 5px rgba(255,0,0,0.7);"></div>
+                </div>
+                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
             </div>
         """, unsafe_allow_html=True)
 
         chat_container = st.container()
 
-        # 1. Render existing messages (stable, no flicker)
         with chat_container:
             for role, msg in st.session_state.messages:
                 st.chat_message("user" if role == "user" else "assistant").write(msg)
 
-        # 2. Take input
-        user_input = st.chat_input("Ask something...")
+        user_input = st.chat_input("Ask anything about this video...")
 
-        # 3. Handle new input WITHOUT re-rendering everything again
         if user_input:
-            # Show user message immediately (without touching old ones)
             with chat_container:
                 st.chat_message("user").write(user_input)
 
-                # Spinner ONLY wraps API call
-                with st.spinner("Thinking..."):
+                with st.spinner("Analysing..."):
                     res = requests.post(
                         f"{API_URL}/ask",
                         json={
                             "video_id": st.session_state.video_id,
                             "question": user_input
-                        }
+                        },
+                        headers=auth_headers()
                     ).json()
 
                     answer = res.get("answer", "Error")
 
                 st.chat_message("assistant").write(answer)
 
-            # Store AFTER rendering (important)
             st.session_state.messages.append(("user", user_input))
             st.session_state.messages.append(("bot", answer))

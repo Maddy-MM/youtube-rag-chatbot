@@ -1,18 +1,30 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from src.ingest import get_transcript
-from src.splitter import split_text
-from src.embeddings import create_vector_store
-from src.retriever import get_retriever
-from src.chains import build_chain
+from src.rag.ingest import get_transcript
+from src.rag.splitter import split_text
+from src.rag.embeddings import create_vector_store
+from src.rag.retriever import get_retriever
+from src.rag.chains import build_chain
+from src.database import User
+from src.auth import (
+    get_db,
+    get_user,
+    create_user,
+    verify_password,
+    create_access_token,
+    get_current_user,
+)
 
 router = APIRouter()
 
 # In-memory store
 vector_store_cache = {}
 
+# -------------------------
 # Models
+# -------------------------
 class VideoRequest(BaseModel):
     video_id: str
 
@@ -24,22 +36,50 @@ class ManualTranscriptRequest(BaseModel):
     video_id: str
     transcript: str
 
-# Helper Function
+class AuthRequest(BaseModel):
+    username: str
+    password: str
+
+# -------------------------
+# Helper
+# -------------------------
 def extract_video_id(url: str) -> str:
     if "v=" in url:
         return url.split("v=")[-1].split("&")[0]
     elif "youtu.be/" in url:
         return url.split("youtu.be/")[-1].split("?")[0]
-    return url  # already an ID
+    return url
 
-#Endpoints
+# -------------------------
+# Public endpoints
+# -------------------------
 @router.get("/health")
 def health():
     return {"status": "ok"}
 
-@router.post("/process_video")
-def process_video(req: VideoRequest):
+@router.post("/register")
+def register(req: AuthRequest, db: Session = Depends(get_db)):
+    if get_user(db, req.username):
+        raise HTTPException(status_code=400, detail="Username already taken")
+    create_user(db, req.username, req.password)
+    return {"message": "User registered successfully"}
 
+@router.post("/login")
+def login(req: AuthRequest, db: Session = Depends(get_db)):
+    user = get_user(db, req.username)
+    if not user or not verify_password(req.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token = create_access_token(user.username)
+    return {"access_token": token, "token_type": "bearer"}
+
+# -------------------------
+# Protected endpoints
+# -------------------------
+@router.post("/process_video")
+def process_video(
+    req: VideoRequest,
+    current_user: User = Depends(get_current_user)
+):
     video_id = extract_video_id(req.video_id)
 
     if video_id in vector_store_cache:
@@ -47,7 +87,6 @@ def process_video(req: VideoRequest):
 
     transcript, status = get_transcript(video_id)
 
-    # Both direct and proxy fetch failed — tell frontend to show paste UI
     if status == "fallback":
         return {"error": "fallback"}
 
@@ -58,9 +97,10 @@ def process_video(req: VideoRequest):
     return {"message": "Video processed successfully"}
 
 @router.post("/process_video_manual")
-def process_video_manual(req: ManualTranscriptRequest):
-
-    # User pasted transcript manually — run it through the same pipeline
+def process_video_manual(
+    req: ManualTranscriptRequest,
+    current_user: User = Depends(get_current_user)
+):
     video_id = extract_video_id(req.video_id)
 
     docs = split_text(req.transcript)
@@ -70,8 +110,10 @@ def process_video_manual(req: ManualTranscriptRequest):
     return {"message": "Video processed successfully"}
 
 @router.post("/ask")
-def ask_question(req: QuestionRequest):
-
+def ask_question(
+    req: QuestionRequest,
+    current_user: User = Depends(get_current_user)
+):
     video_id = extract_video_id(req.video_id)
 
     if video_id not in vector_store_cache:
