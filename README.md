@@ -191,7 +191,7 @@ Built with Streamlit:
 ## Project Structure
 
 ```text
-ytlens/
+youtube-rag-assistant/
 │
 ├── backend/
 │   ├── Dockerfile
